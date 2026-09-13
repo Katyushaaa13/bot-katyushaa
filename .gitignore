@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Session WhatsApp (JANGAN UPLOAD!)
+auth_info/
+
+# File sementara
+temp/
+
+# Database lokal
+db.json
+
+# Cookies YouTube
+cookies.json
+
+# File environment (API key, dll.)
+.env
+
+# Log
+*.log
+npm-debug.log*
+
+# File sistem
+.DS_Store
+Thumbs.db
