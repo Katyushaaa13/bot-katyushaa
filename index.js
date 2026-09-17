@@ -1,55 +1,86 @@
 import makeWASocket, { useMultiFileAuthState, DisconnectReason } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
-import qrcode from 'qrcode-terminal';
+import readline from 'readline';
 import commandHandler from './handler/commandhandler.js';
 import { config } from './config.js';
 
 const { prefix, autoRead } = config;
 
-let reconnectAttempts = 0;
-const MAX_RECONNECT_ATTEMPTS = 5;
+let isPairing = false;
 
-async function startBot() {
+// Fungsi untuk tanya nomor di terminal
+function tanyaNomor() {
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+    console.log('\n=======================================');
+    console.log('   MASUKKAN NOMOR WHATSAPP BOT');
+    console.log('=======================================');
+    console.log('Format: kode negara tanpa + dan tanpa 0 di depan');
+    console.log('Contoh: 6281234567890');
+    console.log('=======================================\n');
+
+    rl.question('Nomor Bot: ', (jawaban) => {
+      rl.close();
+      const nomor = jawaban.replace(/[^0-9]/g, '');
+      resolve(nomor);
+    });
+  });
+}
+
+async function startBot(nomorBot) {
   const { state, saveCreds } = await useMultiFileAuthState('auth_info');
   const sock = makeWASocket({
     auth: state,
-    logger: pino({ level: 'info' }),
-    printQRInTerminal: true, // biar QR muncul otomatis
+    logger: pino({ level: 'silent' }),
+    printQRInTerminal: false,
     browser: ['WormBot', 'Chrome', '120.0.0.0'],
   });
 
   sock.ev.on('creds.update', saveCreds);
 
-  sock.ev.on('connection.update', (update) => {
-    const { connection, lastDisconnect, qr } = update;
+  // Request pairing code jika belum login
+  if (!sock.authState.creds.registered) {
+    isPairing = true;
+    setTimeout(async () => {
+      try {
+        const code = await sock.requestPairingCode(nomorBot);
+        console.log('\n=======================================');
+        console.log('   PAIRING CODE KAMU: ' + code);
+        console.log('=======================================');
+        console.log('Cara pakai:');
+        console.log('1. Buka WhatsApp di HP');
+        console.log('2. Settings > Perangkat Tertaut > Tautkan Perangkat');
+        console.log('3. Pilih "Tautkan dengan nomor telepon"');
+        console.log('4. Masukkan kode di atas');
+        console.log('=======================================\n');
+      } catch (err) {
+        console.error('Gagal request pairing code:', err.message);
+      }
+    }, 5000);
+  }
 
-    if (qr) {
-      console.log('📱 Scan QR Code:');
-      qrcode.generate(qr, { small: true });
-      reconnectAttempts = 0; // reset jika QR baru
-    }
+  sock.ev.on('connection.update', (update) => {
+    const { connection, lastDisconnect } = update;
 
     if (connection === 'close') {
-      const statusCode = lastDisconnect?.error?.output?.statusCode;
-      const isLoggedOut = statusCode === DisconnectReason.loggedOut;
-
-      if (isLoggedOut) {
-        console.log('🚪 Logout permanen. Hapus auth_info dan scan ulang.');
+      if (isPairing) {
+        console.log('⚠️ Koneksi terputus saat pairing. Jalankan ulang bot.');
         return;
       }
-
-      if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-        reconnectAttempts++;
-        console.log(`🔄 Reconnect attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}...`);
-        setTimeout(startBot, 3000);
+      const shouldReconnect = (lastDisconnect?.error instanceof Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
+      if (shouldReconnect) {
+        console.log('🔄 Reconnect...');
+        startBot(nomorBot);
       } else {
-        console.log('❌ Gagal reconnect setelah beberapa kali. Restart manual.');
-        process.exit(1);
+        console.log('🚪 Logout.');
       }
     } else if (connection === 'open') {
       console.log('✅ Bot connected!');
-      reconnectAttempts = 0;
+      isPairing = false;
     }
   });
 
@@ -79,9 +110,19 @@ async function startBot() {
 
       await commandHandler(sock, msg, command, fullArgs, sender, isGroup, pushName);
     } catch (error) {
-      console.error('❌ Error:', error);
+      console.error('❌ Error:', error.message);
     }
   });
 }
 
-startBot();
+// ========== MAIN ==========
+(async () => {
+  const nomorBot = await tanyaNomor();
+  if (!nomorBot || nomorBot.length < 10) {
+    console.log('❌ Nomor tidak valid. Jalankan ulang bot.');
+    process.exit(1);
+  }
+  console.log(`\n✅ Nomor bot: ${nomorBot}`);
+  console.log('⏳ Menghubungkan ke WhatsApp...\n');
+  startBot(nomorBot);
+})();
