@@ -3,7 +3,7 @@ import downloaderhandler from './downloaderhandler.js';
 import funhandler from './funhandler.js';
 import gamehandler from './gamehandler.js';
 import grouphandler from './grouphandler.js';
-import menuhandler from './menuHandler.js';
+import menuhandler from './menuhandler.js';
 import ownerhandler from './ownerhandler.js';
 import profilehandler from './profilehandler.js';
 import searchhandler from './searchhandler.js';
@@ -12,7 +12,7 @@ import youtubehandler from './youtubehandler.js';
 import db from '../utils/database.js';
 import { config } from '../config.js';
 
-const { prefix, owner, skipImageCommands } = config;
+const { prefix, owner } = config;
 
 export default async function commandHandler(sock, msg, command, args, sender, isGroup, pushName) {
   // Cek ban
@@ -27,8 +27,11 @@ export default async function commandHandler(sock, msg, command, args, sender, i
   }
 
   const commandMap = {
+    // Menu
     'menu': menuhandler,
     'help': menuhandler,
+
+    // AI
     'ai': aihandler,
     'aichara': aihandler,
     'deepseek': aihandler,
@@ -39,22 +42,38 @@ export default async function commandHandler(sock, msg, command, args, sender, i
     'qwen': aihandler,
     'reset-ai': aihandler,
     'reset-ai-group': aihandler,
+
+    // Downloader
     'tiktok': downloaderhandler,
     'ytmp3': downloaderhandler,
     'ytmp4': downloaderhandler,
     'instagram': downloaderhandler,
     'facebook': downloaderhandler,
+    'spotify': downloaderhandler,
+    'twitter': downloaderhandler,
+
+    // Fun
+    'meme': funhandler,
     'dadu': funhandler,
     'koin': funhandler,
-    'meme': funhandler,
-    'reaction': funhandler,
     'roast': funhandler,
     'ship': funhandler,
     'suit': funhandler,
+    'reaction': funhandler,
+
+    // Game
     'tebakgambar': gamehandler,
     'tebakkata': gamehandler,
     'tebakbendera': gamehandler,
+    'tebaklirik': gamehandler,
+    'asahotak': gamehandler,
+    'caklontong': gamehandler,
+    'susunkata': gamehandler,
+    'tictactoe': gamehandler,
+    'math': gamehandler,
     'leaderboard': gamehandler,
+
+    // Group
     'tagall': grouphandler,
     'hidetag': grouphandler,
     'promote': grouphandler,
@@ -70,7 +89,15 @@ export default async function commandHandler(sock, msg, command, args, sender, i
     'set-welcome': grouphandler,
     'set-goodbye': grouphandler,
     'groupinfo': grouphandler,
+    'setsubject': grouphandler,
+    'setdesc': grouphandler,
+    'leave-group': grouphandler,
+
+    // Owner
     'banlist': ownerhandler,
+    'setbotname': ownerhandler,
+
+    // Profile
     'profile': profilehandler,
     'setname': profilehandler,
     'setbio': profilehandler,
@@ -79,11 +106,16 @@ export default async function commandHandler(sock, msg, command, args, sender, i
     'afk': profilehandler,
     'level': profilehandler,
     'getpp': profilehandler,
+
+    // Search
     'google': searchhandler,
     'jadwalsholat': searchhandler,
     'lyric': searchhandler,
     'wallhaven': searchhandler,
     'yts': searchhandler,
+    'ytms': searchhandler,
+
+    // Tools
     'sticker': toolshandler,
     'qr': toolshandler,
     'translate': toolshandler,
@@ -94,6 +126,8 @@ export default async function commandHandler(sock, msg, command, args, sender, i
     'tts': toolshandler,
     'emojimix': toolshandler,
     'calculator': toolshandler,
+
+    // YouTube
     'play': youtubehandler,
     'play2': youtubehandler,
     'yt': youtubehandler,
@@ -103,34 +137,10 @@ export default async function commandHandler(sock, msg, command, args, sender, i
   const handler = commandMap[command];
   if (handler) {
     try {
-      // Eksekusi handler
       await handler(sock, msg, command, args, sender, isGroup, pushName);
-
-      // === KIRIM FOTO PROFIL USER SEBAGAI KONFIRMASI (jika command tidak ada di skip list) ===
-      if (!skipImageCommands.includes(command)) {
-        try {
-          // Ambil foto profil user
-          const ppUrl = await sock.profilePictureUrl(sender, 'image');
-          
-          // Tunggu 1 detik agar tidak spam
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
-          await sock.sendMessage(sender, {
-            image: { url: ppUrl },
-            caption: `✅ Command .${command} berhasil dijalankan!`
-          });
-          console.log(`✅ Gambar konfirmasi dikirim untuk .${command} (${pushName})`);
-        } catch (ppError) {
-          // Jika user tidak punya foto profil atau error, kirim teks biasa
-          console.log(`⚠️ Gagal ambil foto profil untuk ${pushName}: ${ppError.message}`);
-          await sock.sendMessage(sender, { 
-            text: `✅ Command .${command} berhasil dijalankan!` 
-          });
-        }
-      }
     } catch (error) {
       console.error('Error executing command:', error);
-      await sock.sendMessage(sender, { text: `❌ Terjadi error: ${error.message}` });
+      await sock.sendMessage(sender, { text: `❌ Error: ${error.message}` });
     }
   }
 }
