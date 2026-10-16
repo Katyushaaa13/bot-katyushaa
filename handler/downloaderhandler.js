@@ -1,57 +1,36 @@
 import ytdl from '@distube/ytdl-core';
+import fetch from 'node-fetch';
 
-export default async function (sock, msg, command, args, sender, isGroup, pushName) {
-  if (!args) return sock.sendMessage(sender, { text: 'Masukkan URL.' });
+export default async function downloaderHandler(sock, msg, command, args, sender, isGroup, pushName) {
+  const reply = (text) => sock.sendMessage(sender, { text }, { quoted: msg });
+  if (!args) return reply('Masukkan URL.');
 
-  switch (command) {
-    case 'tiktok': {
-      // Ganti dengan library yang benar atau API
-      // Contoh menggunakan API publik:
-      try {
-        const response = await fetch(`https://api.tiklydown.eu.org/api/download?url=${encodeURIComponent(args)}`);
-        const data = await response.json();
-        await sock.sendMessage(sender, {
-          video: { url: data.video || data.result?.video },
-          caption: `TikTok by ${data.author?.nickname || 'Unknown'}`
-        });
-      } catch {
-        await sock.sendMessage(sender, { text: 'Gagal download TikTok. Coba lain.' });
+  try {
+    switch (command) {
+      case 'tiktok':
+      case 'tt': {
+        const res = await fetch(`https://api.tiklydown.eu.org/api/download?url=${encodeURIComponent(args)}`);
+        const data = await res.json();
+        if (!data.video) throw new Error('Gagal ambil video');
+        await sock.sendMessage(sender, { video: { url: data.video }, caption: `TikTok by ${data.author?.nickname || 'Unknown'}` }, { quoted: msg });
+        break;
       }
-      break;
+      case 'ytmp3': {
+        const info = await ytdl.getInfo(args);
+        const audioStream = ytdl(args, { filter: 'audioonly', quality: 'highestaudio' });
+        await sock.sendMessage(sender, { audio: audioStream, mimetype: 'audio/mp4', fileName: `${info.videoDetails.title}.mp3` }, { quoted: msg });
+        break;
+      }
+      case 'ytmp4': {
+        const info = await ytdl.getInfo(args);
+        const videoStream = ytdl(args, { filter: 'videoandaudio', quality: 'highest' });
+        await sock.sendMessage(sender, { video: videoStream, caption: info.videoDetails.title }, { quoted: msg });
+        break;
+      }
+      default:
+        await reply(`Downloader .${command} belum diimplementasikan.`);
     }
-
-    case 'ytmp3': {
-      const audioStream = ytdl(args, { filter: 'audioonly', quality: 'highestaudio' });
-      await sock.sendMessage(sender, {
-        audio: audioStream,
-        mimetype: 'audio/mp4',
-        fileName: 'audio.mp3'
-      });
-      break;
-    }
-
-    case 'ytmp4': {
-      const videoStream = ytdl(args, { filter: 'videoandaudio', quality: 'highest' });
-      await sock.sendMessage(sender, {
-        video: videoStream,
-        caption: 'Video YouTube'
-      });
-      break;
-    }
-
-    case 'instagram': {
-      // Implementasi Instagram downloader
-      await sock.sendMessage(sender, { text: 'Fitur Instagram sedang dalam pengembangan.' });
-      break;
-    }
-
-    case 'facebook': {
-      await sock.sendMessage(sender, { text: 'Fitur Facebook sedang dalam pengembangan.' });
-      break;
-    }
-
-    default: {
-      await sock.sendMessage(sender, { text: `Downloader untuk command .${command} belum diimplementasikan.` });
-    }
+  } catch (error) {
+    await reply(`Error: ${error.message}`);
   }
 }
