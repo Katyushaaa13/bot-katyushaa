@@ -1,8 +1,9 @@
 export default async function menuHandler(sock, msg, command, args, sender, isGroup, pushName) {
   const userJid = isGroup ? msg.key.participant : sender;
 
-  const menuText = `
+  const imageURL = 'https://i.postimg.cc/RZp3jhjs/c43e248d15b2e2be924132cd49c25217.jpg';
 
+  const menuText = `
 ╭─〔 Katyusha BOT 〕
 │ 👤 User: ${pushName}
 │ ⏱ Runtime: Aktif
@@ -59,7 +60,7 @@ export default async function menuHandler(sock, msg, command, args, sender, isGr
 │ .promote
 │ .demote
 │ .add
-│ .remove
+│ .kick
 │ .linkgc
 │ .revoke
 │ .open
@@ -122,17 +123,18 @@ export default async function menuHandler(sock, msg, command, args, sender, isGr
 https://whatsapp.com/channel/0029VbDC29560eBfBBT94d3L
 
 > Gunakan .[command] untuk menjalankan
-> Bot by X1Katyushaa | Katyushaa - bot
+> Bot by X1Katyushaa | Katyusha - bot
   `;
 
   try {
-    const ppUrl = await sock.profilePictureUrl(userJid, 'image');
     await sock.sendMessage(sender, {
-      image: { url: ppUrl },
-      caption: menuText
-    });
-    console.log(`✅ Menu dikirim dengan foto profil ${pushName}`);
-  } catch {
-    await sock.sendMessage(sender, { text: menuText });
+      image: { url: imageURL },
+      caption: menuText,
+      mentions: [userJid]
+    }, { quoted: msg });
+    console.log(`✅ Menu dikirim ke ${pushName}`);
+  } catch (err) {
+    console.error(`❌ Gagal mengirim menu ke ${pushName}:`, err);
+    await sock.sendMessage(sender, { text: menuText }, { quoted: msg });
   }
 }
