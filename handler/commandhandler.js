@@ -17,27 +17,32 @@ const { prefix, owner } = config;
 export default async function commandHandler(sock, msg, command, args, sender, isGroup, pushName) {
   // Cek ban
   if (db.data.bans && db.data.bans.includes(sender)) {
-    return sock.sendMessage(sender, { text: 'Kamu di-ban dari bot ini.' });
+    return sock.sendMessage(sender, { text: 'Kamu di-ban dari bot ini.' }, { quoted: msg });
   }
 
   // Owner-only commands
   const ownerOnly = ['banlist', 'reset-ai', 'reset-ai-group', 'setbotname', 'setbotowner', 'setpp', 'jadibot', 'scanbot', 'broadcast'];
   if (ownerOnly.includes(command) && !owner.includes(sender)) {
-    return sock.sendMessage(sender, { text: 'Command ini khusus owner.' });
+    return sock.sendMessage(sender, { text: 'Command ini khusus owner.' }, { quoted: msg });
   }
 
   const commandMap = {
     // Menu
     'menu': menuhandler,
+    'm': menuhandler,
     'help': menuhandler,
 
     // AI
     'ai': aihandler,
+    'a': aihandler,
     'aichara': aihandler,
     'deepseek': aihandler,
+    'ds': aihandler,
     'gemini': aihandler,
+    'gem': aihandler,
     'gemma': aihandler,
     'gpt': aihandler,
+    'g': aihandler,
     'llm': aihandler,
     'qwen': aihandler,
     'reset-ai': aihandler,
@@ -45,12 +50,17 @@ export default async function commandHandler(sock, msg, command, args, sender, i
 
     // Downloader
     'tiktok': downloaderhandler,
+    'tt': downloaderhandler,
     'ytmp3': downloaderhandler,
     'ytmp4': downloaderhandler,
     'instagram': downloaderhandler,
+    'ig': downloaderhandler,
     'facebook': downloaderhandler,
+    'fb': downloaderhandler,
     'spotify': downloaderhandler,
+    'sp': downloaderhandler,
     'twitter': downloaderhandler,
+    'tw': downloaderhandler,
 
     // Fun
     'meme': funhandler,
@@ -70,15 +80,23 @@ export default async function commandHandler(sock, msg, command, args, sender, i
     'caklontong': gamehandler,
     'susunkata': gamehandler,
     'tictactoe': gamehandler,
+    'ttt': gamehandler,
     'math': gamehandler,
     'leaderboard': gamehandler,
+    'lb': gamehandler,
 
     // Group
     'tagall': grouphandler,
+    'ta': grouphandler,
     'hidetag': grouphandler,
+    'ht': grouphandler,
     'promote': grouphandler,
+    'prom': grouphandler,
     'demote': grouphandler,
+    'dem': grouphandler,
     'add': grouphandler,
+    'kick': grouphandler,
+    'k': grouphandler,
     'remove': grouphandler,
     'linkgc': grouphandler,
     'revoke': grouphandler,
@@ -89,6 +107,7 @@ export default async function commandHandler(sock, msg, command, args, sender, i
     'set-welcome': grouphandler,
     'set-goodbye': grouphandler,
     'groupinfo': grouphandler,
+    'gi': grouphandler,
     'setsubject': grouphandler,
     'setdesc': grouphandler,
     'leave-group': grouphandler,
@@ -96,9 +115,11 @@ export default async function commandHandler(sock, msg, command, args, sender, i
     // Owner
     'banlist': ownerhandler,
     'setbotname': ownerhandler,
+    'owner': ownerhandler,
 
     // Profile
     'profile': profilehandler,
+    'p': profilehandler,
     'setname': profilehandler,
     'setbio': profilehandler,
     'setage': profilehandler,
@@ -109,26 +130,39 @@ export default async function commandHandler(sock, msg, command, args, sender, i
 
     // Search
     'google': searchhandler,
+    'gl': searchhandler,
     'jadwalsholat': searchhandler,
+    'js': searchhandler,
     'lyric': searchhandler,
+    'ly': searchhandler,
     'wallhaven': searchhandler,
+    'wh': searchhandler,
     'yts': searchhandler,
     'ytms': searchhandler,
 
     // Tools
     'sticker': toolshandler,
+    's': toolshandler,
     'qr': toolshandler,
     'translate': toolshandler,
+    'tr': toolshandler,
     'base64': toolshandler,
+    'b64': toolshandler,
     'upper': toolshandler,
     'lower': toolshandler,
     'ssweb': toolshandler,
+    'ss': toolshandler,
     'tts': toolshandler,
     'emojimix': toolshandler,
+    'emix': toolshandler,
     'calculator': toolshandler,
+    'calc': toolshandler,
+    'delete': toolshandler,
+    'del': toolshandler,
 
     // YouTube
     'play': youtubehandler,
+    'pl': youtubehandler,
     'play2': youtubehandler,
     'yt': youtubehandler,
     'album': youtubehandler,
@@ -140,7 +174,7 @@ export default async function commandHandler(sock, msg, command, args, sender, i
       await handler(sock, msg, command, args, sender, isGroup, pushName);
     } catch (error) {
       console.error('Error executing command:', error);
-      await sock.sendMessage(sender, { text: `❌ Error: ${error.message}` });
+      await sock.sendMessage(sender, { text: `❌ Error: ${error.message}` }, { quoted: msg });
     }
   }
 }
