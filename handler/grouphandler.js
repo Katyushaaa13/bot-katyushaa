@@ -7,7 +7,6 @@ export default async function groupHandler(sock, msg, command, args, sender, isG
     const groupId = sender;
     const metadata = await sock.groupMetadata(groupId);
 
-    // === DETEKSI ADMIN TOLERAN (LID + JID) ===
     const senderIds = new Set();
     senderIds.add(sender);
     if (msg.key.participant) senderIds.add(msg.key.participant);
@@ -24,22 +23,32 @@ export default async function groupHandler(sock, msg, command, args, sender, isG
     if (!db.data.groups[groupId]) db.data.groups[groupId] = {};
     const groupData = db.data.groups[groupId];
 
+    // === TARGET: dari mention, reply, atau nomor ===
+    const getTarget = () => {
+      const ctx = msg.message.extendedTextMessage?.contextInfo;
+      if (ctx?.mentionedJid?.[0]) return ctx.mentionedJid[0];
+      if (ctx?.participant) return ctx.participant;
+      if (args) {
+        const nomor = args.replace(/[^0-9]/g, '');
+        if (nomor.length >= 10) return nomor + '@s.whatsapp.net';
+      }
+      return null;
+    };
+
     switch (command) {
-      // ============ TAG ALL ============
-      case 'tagall': {
+      case 'tagall':
+      case 'ta': {
         if (!isAdmin) return sock.sendMessage(groupId, { text: 'Hanya admin.' });
         const mentions = metadata.participants.map(p => p.id);
         const pesanTambahan = args ? `\n\nPesan: ${args}` : '';
         let text = `📢 *TAG ALL*${pesanTambahan}\n\n`;
-        metadata.participants.forEach((p, i) => {
-          text += `${i + 1}. @${p.id.split('@')[0]}\n`;
-        });
+        metadata.participants.forEach((p, i) => { text += `${i + 1}. @${p.id.split('@')[0]}\n`; });
         await sock.sendMessage(groupId, { text, mentions });
         break;
       }
 
-      // ============ HIDETAG ============
-      case 'hidetag': {
+      case 'hidetag':
+      case 'ht': {
         if (!isAdmin) return sock.sendMessage(groupId, { text: 'Hanya admin.' });
         if (!args) return sock.sendMessage(groupId, { text: 'Masukkan pesan.' });
         const mentions = metadata.participants.map(p => p.id);
@@ -47,29 +56,40 @@ export default async function groupHandler(sock, msg, command, args, sender, isG
         break;
       }
 
-      // ============ PROMOTE ============
-      case 'promote': {
+      case 'promote':
+      case 'prom': {
         if (!isAdmin) return sock.sendMessage(groupId, { text: 'Hanya admin.' });
-        const target = msg.message.extendedTextMessage?.contextInfo?.mentionedJid?.[0]
-          || (args ? args.replace(/[^0-9]/g, '') + '@s.whatsapp.net' : null);
-        if (!target) return sock.sendMessage(groupId, { text: 'Tag atau masukkan nomor target.' });
+        const target = getTarget();
+        if (!target) return sock.sendMessage(groupId, { text: 'Tag, reply, atau masukkan nomor target.' });
         await sock.groupParticipantsUpdate(groupId, [target], 'promote');
         await sock.sendMessage(groupId, { text: `✅ @${target.split('@')[0]} dipromote.`, mentions: [target] });
         break;
       }
 
-      // ============ DEMOTE ============
-      case 'demote': {
+      case 'demote':
+      case 'dem': {
         if (!isAdmin) return sock.sendMessage(groupId, { text: 'Hanya admin.' });
-        const target = msg.message.extendedTextMessage?.contextInfo?.mentionedJid?.[0]
-          || (args ? args.replace(/[^0-9]/g, '') + '@s.whatsapp.net' : null);
-        if (!target) return sock.sendMessage(groupId, { text: 'Tag atau masukkan nomor target.' });
+        const target = getTarget();
+        if (!target) return sock.sendMessage(groupId, { text: 'Tag, reply, atau masukkan nomor target.' });
         await sock.groupParticipantsUpdate(groupId, [target], 'demote');
         await sock.sendMessage(groupId, { text: `⬇️ @${target.split('@')[0]} didemote.`, mentions: [target] });
         break;
       }
 
-      // ============ ADD ============
+      case 'kick':
+      case 'k':
+      case 'remove': {
+        if (!isAdmin) return sock.sendMessage(groupId, { text: 'Hanya admin.' });
+        const target = getTarget();
+        if (!target) return sock.sendMessage(groupId, { text: 'Tag, reply, atau masukkan nomor target.' });
+        if (target === sender || target === msg.key.participant) {
+          return sock.sendMessage(groupId, { text: 'Tidak bisa kick diri sendiri.' });
+        }
+        await sock.groupParticipantsUpdate(groupId, [target], 'remove');
+        await sock.sendMessage(groupId, { text: `❌ @${target.split('@')[0]} telah di-kick.`, mentions: [target] });
+        break;
+      }
+
       case 'add': {
         if (!isAdmin) return sock.sendMessage(groupId, { text: 'Hanya admin.' });
         if (!args) return sock.sendMessage(groupId, { text: 'Masukkan nomor.' });
@@ -79,18 +99,6 @@ export default async function groupHandler(sock, msg, command, args, sender, isG
         break;
       }
 
-      // ============ REMOVE ============
-      case 'remove': {
-        if (!isAdmin) return sock.sendMessage(groupId, { text: 'Hanya admin.' });
-        const target = msg.message.extendedTextMessage?.contextInfo?.mentionedJid?.[0]
-          || (args ? args.replace(/[^0-9]/g, '') + '@s.whatsapp.net' : null);
-        if (!target) return sock.sendMessage(groupId, { text: 'Tag atau masukkan nomor target.' });
-        await sock.groupParticipantsUpdate(groupId, [target], 'remove');
-        await sock.sendMessage(groupId, { text: `❌ @${target.split('@')[0]} dikeluarkan.`, mentions: [target] });
-        break;
-      }
-
-      // ============ LINK GC ============
       case 'linkgc': {
         if (!isAdmin) return sock.sendMessage(groupId, { text: 'Hanya admin.' });
         const code = await sock.groupInviteCode(groupId);
@@ -98,7 +106,6 @@ export default async function groupHandler(sock, msg, command, args, sender, isG
         break;
       }
 
-      // ============ REVOKE ============
       case 'revoke': {
         if (!isAdmin) return sock.sendMessage(groupId, { text: 'Hanya admin.' });
         await sock.groupRevokeInvite(groupId);
@@ -106,7 +113,6 @@ export default async function groupHandler(sock, msg, command, args, sender, isG
         break;
       }
 
-      // ============ OPEN ============
       case 'open': {
         if (!isAdmin) return sock.sendMessage(groupId, { text: 'Hanya admin.' });
         await sock.groupSettingUpdate(groupId, 'unlock');
@@ -114,7 +120,6 @@ export default async function groupHandler(sock, msg, command, args, sender, isG
         break;
       }
 
-      // ============ CLOSE ============
       case 'close': {
         if (!isAdmin) return sock.sendMessage(groupId, { text: 'Hanya admin.' });
         await sock.groupSettingUpdate(groupId, 'lock');
@@ -122,7 +127,6 @@ export default async function groupHandler(sock, msg, command, args, sender, isG
         break;
       }
 
-      // ============ ANTI LINK ============
       case 'antilink': {
         if (!isAdmin) return sock.sendMessage(groupId, { text: 'Hanya admin.' });
         if (args !== 'on' && args !== 'off') return sock.sendMessage(groupId, { text: 'Gunakan: .antilink on/off' });
@@ -132,7 +136,6 @@ export default async function groupHandler(sock, msg, command, args, sender, isG
         break;
       }
 
-      // ============ WELCOME ON/OFF ============
       case 'welcome': {
         if (!isAdmin) return sock.sendMessage(groupId, { text: 'Hanya admin.' });
         if (args !== 'on' && args !== 'off') return sock.sendMessage(groupId, { text: 'Gunakan: .welcome on/off' });
@@ -142,7 +145,6 @@ export default async function groupHandler(sock, msg, command, args, sender, isG
         break;
       }
 
-      // ============ SET WELCOME ============
       case 'set-welcome': {
         if (!isAdmin) return sock.sendMessage(groupId, { text: 'Hanya admin.' });
         if (!args) return sock.sendMessage(groupId, { text: 'Masukkan pesan. Gunakan @user dan @grup.' });
@@ -152,7 +154,6 @@ export default async function groupHandler(sock, msg, command, args, sender, isG
         break;
       }
 
-      // ============ SET GOODBYE ============
       case 'set-goodbye': {
         if (!isAdmin) return sock.sendMessage(groupId, { text: 'Hanya admin.' });
         if (!args) return sock.sendMessage(groupId, { text: 'Masukkan pesan.' });
@@ -162,8 +163,8 @@ export default async function groupHandler(sock, msg, command, args, sender, isG
         break;
       }
 
-      // ============ GROUP INFO ============
-      case 'groupinfo': {
+      case 'groupinfo':
+      case 'gi': {
         const info = await sock.groupMetadata(groupId);
         let text = `📋 *Info Grup*\n`;
         text += `Nama: ${info.subject}\n`;
@@ -176,7 +177,6 @@ export default async function groupHandler(sock, msg, command, args, sender, isG
         break;
       }
 
-      // ============ SET SUBJECT ============
       case 'setsubject': {
         if (!isAdmin) return sock.sendMessage(groupId, { text: 'Hanya admin.' });
         if (!args) return sock.sendMessage(groupId, { text: 'Masukkan nama grup baru.' });
@@ -185,7 +185,6 @@ export default async function groupHandler(sock, msg, command, args, sender, isG
         break;
       }
 
-      // ============ SET DESC ============
       case 'setdesc': {
         if (!isAdmin) return sock.sendMessage(groupId, { text: 'Hanya admin.' });
         if (!args) return sock.sendMessage(groupId, { text: 'Masukkan deskripsi baru.' });
@@ -194,7 +193,6 @@ export default async function groupHandler(sock, msg, command, args, sender, isG
         break;
       }
 
-      // ============ LEAVE GROUP ============
       case 'leave-group': {
         if (!isAdmin) return sock.sendMessage(groupId, { text: 'Hanya admin.' });
         await sock.sendMessage(groupId, { text: '👋 Bot keluar dari grup.' });
@@ -209,4 +207,4 @@ export default async function groupHandler(sock, msg, command, args, sender, isG
     console.error('Error grouphandler:', error);
     await sock.sendMessage(sender, { text: `❌ Error: ${error.message}` });
   }
-          }
+}
