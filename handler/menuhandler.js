@@ -1,7 +1,8 @@
 export default async function menuHandler(sock, msg, command, args, sender, isGroup, pushName) {
   const userJid = isGroup ? msg.key.participant : sender;
 
-  const imageURL = 'https://i.postimg.cc/RZp3jhjs/c43e248d15b2e2be924132cd49c25217.jpg';
+  // ==== LINK VIDEO MENU KAMU ====
+  const videoURL = 'https://files.catbox.moe/hvhrij.mp4';
 
   const menuText = `
 ╭─〔 Katyusha BOT 〕
@@ -113,6 +114,8 @@ export default async function menuHandler(sock, msg, command, args, sender, isGr
 ╰──────────────────
 
 ╭─〔 *OWNER* 〕
+│ .owner
+│ .self
 │ .banlist
 │ .reset-ai
 │ .setbotname
@@ -128,13 +131,16 @@ https://whatsapp.com/channel/0029VbDC29560eBfBBT94d3L
 
   try {
     await sock.sendMessage(sender, {
-      image: { url: imageURL },
+      video: { url: videoURL }, // Video MP4 1 MB
       caption: menuText,
+      gifPlayback: true,        // Putar otomatis tanpa suara (seperti GIF)
       mentions: [userJid]
     }, { quoted: msg });
-    console.log(`✅ Menu dikirim ke ${pushName}`);
+    
+    console.log(`✅ Menu video dikirim ke ${pushName}`);
   } catch (err) {
-    console.error(`❌ Gagal mengirim menu ke ${pushName}:`, err);
+    console.error(`❌ Gagal mengirim menu video ke ${pushName}:`, err.message);
+    // Fallback jika video gagal dikirim
     await sock.sendMessage(sender, { text: menuText }, { quoted: msg });
   }
 }
