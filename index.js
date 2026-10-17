@@ -1,7 +1,6 @@
 import makeWASocket, { useMultiFileAuthState, DisconnectReason } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
-import qrcode from 'qrcode-terminal';
 import readline from 'readline';
 import commandHandler from './handler/commandhandler.js';
 import db from './utils/database.js';
@@ -11,7 +10,7 @@ const { prefix, autoRead } = config;
 
 let isPairing = false;
 
-// ==== Fungsi tanya nomor (kalau pakai pairing code) ====
+// Fungsi tanya nomor di terminal
 function tanyaNomor() {
   return new Promise((resolve) => {
     const rl = readline.createInterface({
@@ -38,39 +37,48 @@ async function startBot(nomorBot) {
   const sock = makeWASocket({
     auth: state,
     logger: pino({ level: 'silent' }),
-    printQRInTerminal: true,
+    printQRInTerminal: false,
     browser: ['WormBot', 'Chrome', '120.0.0.0'],
   });
 
   sock.ev.on('creds.update', saveCreds);
 
-  // ================== PAIRING CODE ==================
-  if (!sock.authState.creds.registered && nomorBot) {
+  // ==== REQUEST PAIRING CODE (MENUNGGU KONEKSI SIAP) ====
+  if (!sock.authState.creds.registered) {
     isPairing = true;
-    setTimeout(async () => {
-      try {
-        const code = await sock.requestPairingCode(nomorBot);
-        console.log('\n=======================================');
-        console.log('   PAIRING CODE KAMU: ' + code);
-        console.log('=======================================');
-      } catch (err) {
-        console.error('Gagal request pairing code:', err.message);
+    
+    sock.ev.on('connection.update', async (update) => {
+      const { connection, qr } = update;
+      
+      // Baileys akan mengirim status 'connecting' atau 'qr' saat socket siap
+      if (connection === 'connecting' || qr) {
+        // Cegah request ganda
+        if (sock.authState.creds.registered) return; 
+        
+        try {
+          const code = await sock.requestPairingCode(nomorBot);
+          console.log('\n=======================================');
+          console.log('   PAIRING CODE KAMU: ' + code);
+          console.log('=======================================');
+          console.log('1. Buka WhatsApp di HP');
+          console.log('2. Settings > Perangkat Tertaut > Tautkan Perangkat');
+          console.log('3. Pilih "Tautkan dengan nomor telepon"');
+          console.log('4. Masukkan kode di atas');
+          console.log('=======================================\n');
+        } catch (err) {
+          console.error('Gagal request pairing code:', err.message);
+        }
       }
-    }, 5000);
+    });
   }
 
   // ================== CONNECTION ==================
   sock.ev.on('connection.update', (update) => {
-    const { connection, lastDisconnect, qr } = update;
-
-    if (qr) {
-      console.log('📱 Scan QR Code:');
-      qrcode.generate(qr, { small: true });
-    }
+    const { connection, lastDisconnect } = update;
 
     if (connection === 'close') {
       if (isPairing) {
-        console.log('⚠️ Koneksi terputus saat pairing.');
+        console.log('⚠️ Koneksi terputus saat pairing. Jalankan ulang bot.');
         return;
       }
       const shouldReconnect = (lastDisconnect?.error instanceof Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
@@ -149,10 +157,10 @@ async function startBot(nomorBot) {
       const command = args.shift().toLowerCase();
       const fullArgs = args.join(' ');
 
-      // === TOGGLE SELF MODE (khusus owner) ===
+      // === TOGGLE SELF MODE ===
       if (command === 'self') {
         const userJid = isGroup ? msg.key.participant : sender;
-        if (!config.owner.includes(userJid)) return; // hanya owner
+        if (!config.owner.includes(userJid)) return;
         config.selfMode = !config.selfMode;
         return sock.sendMessage(sender, {
           text: `Self mode ${config.selfMode ? 'AKTIF ✅ (hanya owner)' : 'NONAKTIF ❌ (semua orang)'}`
@@ -168,10 +176,12 @@ async function startBot(nomorBot) {
 
 // ========== MAIN ==========
 (async () => {
-  // Kalau mau pakai pairing code, uncomment baris bawah:
-  // const nomorBot = await tanyaNomor();
-  // startBot(nomorBot);
-
-  // Kalau pakai QR:
-  startBot(null);
+  const nomorBot = await tanyaNomor();
+  if (!nomorBot || nomorBot.length < 10) {
+    console.log('❌ Nomor tidak valid. Jalankan ulang bot.');
+    process.exit(1);
+  }
+  console.log(`\n✅ Nomor bot: ${nomorBot}`);
+  console.log('⏳ Menghubungkan ke WhatsApp...\n');
+  startBot(nomorBot);
 })();
